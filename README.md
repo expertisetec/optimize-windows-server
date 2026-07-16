@@ -35,10 +35,9 @@ powershell -ExecutionPolicy Bypass -File .\Optimize-WindowsServer.ps1
 Direto do GitHub (uma linha, para o time de TI):
 
 ```powershell
-irm https://raw.githubusercontent.com/SEU_USUARIO/optimize-windows-server/main/Optimize-WindowsServer.ps1 | iex
+irm https://raw.githubusercontent.com/expertisetec/optimize-windows-server/main/Optimize-WindowsServer.ps1 | iex
 ```
 
-> Substitua `SEU_USUARIO` pelo usuário/organização do GitHub após publicar.
 
 ## Recomendações
 
@@ -49,4 +48,4 @@ irm https://raw.githubusercontent.com/SEU_USUARIO/optimize-windows-server/main/O
 
 ## Licença
 
-Uso interno — Expertise Tecnologia.
+Uso interno — Expertise Tecnologia. (#cacetedeagulha)
