@@ -16,7 +16,7 @@
 7. **`DISM /StartComponentCleanup`** — remove componentes substituídos do WinSxS.
 8. **`DISM /RestoreHealth`** — repara a imagem do Windows via Windows Update.
 
-Todos os passos rodam com aprovação automática (sem prompts), geram log em `C:\ExpertiseTI\Logs\` e o script exibe relatório de espaço em disco antes/depois.
+Todos os passos rodam com aprovação automática (sem prompts), geram log em `C:\Expertise\Logs\` e o script exibe relatório de espaço em disco antes/depois.
 
 ## Requisitos
 
