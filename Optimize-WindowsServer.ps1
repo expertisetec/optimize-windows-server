@@ -26,7 +26,7 @@
 # -----------------------------------------------------------------------------
 $ErrorActionPreference = 'Continue'
 $ScriptVersion = '1.0.0'
-$LogDir  = 'C:\ExpertiseTI\Logs'
+$LogDir  = 'C:\Expertise\Logs'
 $LogFile = Join-Path $LogDir ("Optimize-WindowsServer_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
 
 if (-not (Test-Path $LogDir)) { New-Item -Path $LogDir -ItemType Directory -Force | Out-Null }
