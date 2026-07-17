@@ -1,0 +1,292 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Social Preview</title>
+<style>
+  :root {
+    --bg-base: #0A0E13;
+    --bg-panel: #0F151C;
+    --bg-header: #141B24;
+    --cyan: #33E1C9;
+    --cyan-dim: #17554C;
+    --cyan-line: #1E3A36;
+    --green: #4ADE80;
+    --amber: #FBBF24;
+    --text: #EAF2F1;
+    --muted: #6E8A94;
+    --muted-2: #4B616B;
+    --hairline: #1E2A32;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1280px; height: 640px;
+    background: var(--bg-base);
+    overflow: hidden;
+    font-family: "Segoe UI", sans-serif;
+    color: var(--text);
+  }
+  .stage {
+    position: relative;
+    width: 1280px; height: 640px;
+    display: flex;
+  }
+
+  /* faint dot-grid texture on the base, evokes a NOC monitoring wall */
+  .stage::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: radial-gradient(var(--hairline) 1px, transparent 1px);
+    background-size: 28px 28px;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .stage::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(720px 480px at 0% 100%, rgba(51,225,201,0.10), transparent 65%);
+    pointer-events: none;
+  }
+
+  /* ---------- LEFT: brand block ---------- */
+  .brand {
+    position: relative;
+    width: 500px;
+    height: 640px;
+    padding: 56px 48px;
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+  }
+
+  .mark {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 34px;
+  }
+  .mark-icon { display: block; width: 34px; height: 34px; }
+  .mark-text {
+    font-family: "Segoe UI Semibold", "Segoe UI", sans-serif;
+    font-size: 18px;
+    letter-spacing: 2.5px;
+    color: var(--text);
+  }
+  .sector {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    letter-spacing: 2px;
+    color: var(--cyan);
+    margin-bottom: 46px;
+    margin-top: -22px;
+    padding-left: 46px;
+  }
+
+  .headline {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-weight: 600;
+    font-size: 38px;
+    line-height: 1.28;
+    letter-spacing: -0.5px;
+    text-wrap: balance;
+    margin-bottom: 22px;
+  }
+  .headline .prompt { color: var(--cyan); }
+  .headline .cursor {
+    display: inline-block;
+    width: 16px; height: 32px;
+    background: var(--cyan);
+    vertical-align: -5px;
+    margin-left: 4px;
+    opacity: 0.9;
+  }
+
+  .desc {
+    font-size: 16.5px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 380px;
+    margin-bottom: 30px;
+  }
+
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: auto;
+  }
+  .badge {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: var(--cyan);
+    border: 1px solid var(--cyan-dim);
+    background: rgba(51,225,201,0.05);
+    border-radius: 3px;
+    padding: 6px 11px;
+  }
+
+  .footer {
+    border-top: 1px solid var(--hairline);
+    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .footer .site {
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .footer .platforms {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chip {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--cyan);
+    border: 1px solid var(--cyan-dim);
+    border-radius: 3px;
+    width: 30px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .footer .license {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--muted-2);
+    letter-spacing: 0.5px;
+  }
+
+  /* ---------- RIGHT: terminal mockup, full-bleed ---------- */
+  .termwrap {
+    position: relative;
+    flex: 1;
+    height: 640px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--cyan-line);
+    overflow: hidden;
+    z-index: 1;
+  }
+  .titlebar {
+    height: 40px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 10px;
+  }
+  .titlebar .glyph {
+    font-family: "Cascadia Code", Consolas, monospace;
+    color: var(--cyan);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .titlebar .title {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: 0.3px;
+  }
+  .titlebar .controls {
+    margin-left: auto;
+    display: flex;
+    gap: 16px;
+    color: var(--muted-2);
+    font-size: 13px;
+    font-family: "Segoe UI", sans-serif;
+  }
+
+  .termbody {
+    padding: 26px 30px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 14.5px;
+    line-height: 1.92;
+    white-space: pre;
+    font-variant-ligatures: none;
+    font-feature-settings: "calt" 0, "liga" 0;
+  }
+  .rule   { color: var(--cyan); opacity: 0.85; }
+  .head   { color: var(--cyan); }
+  .ok     { color: var(--green); }
+  .amber  { color: var(--amber); }
+  .pend   { color: var(--muted-2); }
+  .num    { color: var(--muted); }
+  .label  { color: var(--text); }
+  .dots   { color: var(--muted-2); }
+  .logln  { color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="stage">
+
+    <div class="brand">
+      <div class="mark">
+        <img class="mark-icon" alt="Expertise Tecnologia"
+             src="data:image/png;base64,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">
+        <span class="mark-text">EXPERTISE TECNOLOGIA</span>
+      </div>
+      <div class="sector">TECNOLOGIA DA INFORMAÇÃO&nbsp;&nbsp;·&nbsp;&nbsp;NOC</div>
+
+      <div class="headline"><span class="prompt">&gt;_</span> WindowsOptimizer<br>Cleanup<span class="cursor"></span></div>
+
+      <div class="desc">
+        Limpeza e otimização de Windows com boas práticas Microsoft — temporários, cache de navegadores, Windows Update, SFC e DISM.
+      </div>
+
+      <div class="badges">
+        <span class="badge">v1.1.0</span>
+        <span class="badge">POWERSHELL 5.1+</span>
+        <span class="badge">EXPERTISE4ALL LICENSE</span>
+      </div>
+
+      <div class="footer">
+        <div class="site">expertise.tec.br</div>
+        <div class="platforms">
+          <span class="chip">WWW</span>
+          <span class="chip">in</span>
+          <span class="chip">IG</span>
+          <span class="chip">GH</span>
+        </div>
+        <div class="license">Licença pública Expertise4All — uso liberado</div>
+      </div>
+    </div>
+
+    <div class="termwrap">
+      <div class="titlebar">
+        <span class="glyph">&gt;_</span>
+        <span class="title">Administrador: Windows PowerShell — WindowsOptimizerCleanup.ps1</span>
+        <span class="controls">─&nbsp;&nbsp;&nbsp;□&nbsp;&nbsp;&nbsp;×</span>
+      </div>
+      <div class="termbody">
+<span class="rule">===============================================================</span>
+<span class="head"> EXPERTISE TECNOLOGIA - WindowsOptimizerCleanup</span>
+<span class="head"> Setor: Tecnologia da Informacao / NOC | Versao: 1.1.0</span>
+<span class="head"> Computador: SRV-NOC01 | Usuario: Administrador</span>
+<span class="rule">===============================================================</span>
+
+<span class="num">  [1]</span> <span class="label">Limpeza de temporarios</span> <span class="dots">................</span> <span class="ok">OK</span>
+<span class="num">  [2]</span> <span class="label">Cache de navegadores</span> <span class="dots">..................</span> <span class="ok">OK</span>
+<span class="num">  [3]</span> <span class="label">Lixeira</span> <span class="dots">...............................</span> <span class="ok">OK</span>
+<span class="num">  [4]</span> <span class="label">Cache do Windows Update</span> <span class="dots">...............</span> <span class="ok">OK</span>
+<span class="num">  [5]</span> <span class="label">Logs e caches secundarios</span> <span class="dots">.............</span> <span class="ok">OK</span>
+<span class="num">  [6]</span> <span class="label">SFC /scannow</span> <span class="dots">..........................</span> <span class="ok">OK</span>
+<span class="num">  [7]</span> <span class="label">DISM - AnalyzeComponentStore</span> <span class="dots">..........</span> <span class="ok">OK</span>
+<span class="num">  [8]</span> <span class="label">DISM - StartComponentCleanup</span> <span class="dots">..........</span> <span class="amber">Executando... (63.4%)</span>
+<span class="num">  [9]</span> <span class="label">DISM - RestoreHealth</span> <span class="dots">..................</span> <span class="pend">Pendente</span>
+
+<span class="rule">===============================================================</span>
+<span class="logln"> Log: C:\Expertise\Logs\WindowsOptimizerCleanup_20260717.log</span>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
