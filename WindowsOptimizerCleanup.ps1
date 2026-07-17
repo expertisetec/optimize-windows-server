@@ -4,17 +4,19 @@
 ===============================================================================
   Script      : WindowsOptimizerCleanup.ps1
   Descricao   : Limpeza e otimizacao de Windows com aplicacao de boas
-                praticas Microsoft (temporarios, cache de navegadores,
-                Lixeira, cache do Windows Update, SFC e DISM), com log e
-                relatorio de espaco.
+                praticas Microsoft (atualizacao do PowerShell 7,
+                temporarios, cache de navegadores, Lixeira, cache do
+                Windows Update, SFC e DISM), com log e relatorio de espaco.
   Setor       : Tecnologia da Informacao / NOC
   Autor       : Pablo Fernando Schutz
   Empresa     : Expertise Tecnologia
-  Versao      : 1.2.0
+  Versao      : 1.3.0
   Data        : 17/07/2026
   Licenca     : Expertise4All - uso publico e liberado (ver arquivo LICENSE)
   Requisitos  : Windows 10/11 ou Windows Server 2016 ou superior | PowerShell 5.1+
                 Executar como Administrador
+                Acesso a internet (github.com) e opcional - usado so para
+                verificar/instalar o PowerShell 7 mais recente (Passo 1)
   Uso         : powershell -ExecutionPolicy Bypass -File .\WindowsOptimizerCleanup.ps1
 -------------------------------------------------------------------------------
   Site        : https://www.expertise.tec.br/
@@ -32,7 +34,7 @@
 # CONFIGURACAO INICIAL E LOG
 # -----------------------------------------------------------------------------
 $ErrorActionPreference = 'Continue'
-$ScriptVersion = '1.2.0'
+$ScriptVersion = '1.3.0'
 $LogDir  = 'C:\Expertise\Logs'
 $LogFile = Join-Path $LogDir ("WindowsOptimizerCleanup_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
 
@@ -89,15 +91,16 @@ function Get-UserProfileFolders {
 # a busca por chave usada abaixo.
 
 $Steps = [ordered]@{
-    '1' = 'Limpeza de temporarios'
-    '2' = 'Cache de navegadores'
-    '3' = 'Lixeira'
-    '4' = 'Cache do Windows Update'
-    '5' = 'Logs e caches secundarios'
-    '6' = 'SFC /scannow'
-    '7' = 'DISM - AnalyzeComponentStore'
-    '8' = 'DISM - StartComponentCleanup'
-    '9' = 'DISM - RestoreHealth'
+    '1'  = 'Verificar/atualizar PowerShell 7'
+    '2'  = 'Limpeza de temporarios'
+    '3'  = 'Cache de navegadores'
+    '4'  = 'Lixeira'
+    '5'  = 'Cache do Windows Update'
+    '6'  = 'Logs e caches secundarios'
+    '7'  = 'SFC /scannow'
+    '8'  = 'DISM - AnalyzeComponentStore'
+    '9'  = 'DISM - StartComponentCleanup'
+    '10' = 'DISM - RestoreHealth'
 }
 $StepStatus = [ordered]@{}
 foreach ($key in $Steps.Keys) { $StepStatus[$key] = 'Pendente' }
@@ -197,6 +200,98 @@ function Invoke-DismStep {
     return $exitCode
 }
 
+# --- PowerShell 7: verificacao/atualizacao (Passo 1) -------------------------
+
+function Get-InstalledPwshVersion {
+    <#  Retorna a versao instalada do PowerShell 7 (pwsh.exe) como [version],
+        ou $null se nao estiver instalado. #>
+    $pwshPath = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
+    if (-not (Test-Path $pwshPath)) {
+        $cmd = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+        if ($cmd) { $pwshPath = $cmd.Source } else { return $null }
+    }
+    try {
+        $verText = & $pwshPath -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>$null
+        if ($verText) { return [version](($verText | Select-Object -Last 1).Trim()) }
+    } catch { }
+    return $null
+}
+
+function Get-LatestPwshRelease {
+    <#  Consulta a API publica do GitHub pela ultima versao estavel do
+        PowerShell 7 e o instalador MSI x64 correspondente (o formato que a
+        Microsoft recomenda para servidores). Retorna $null se nao for
+        possivel consultar (sem internet, GitHub bloqueado por firewall
+        corporativo, etc) - tratado como "nao foi possivel confirmar", nunca
+        como erro fatal do script. #>
+    try {
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+    } catch { }
+    try {
+        $release = Invoke-RestMethod -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop `
+            -Uri 'https://api.github.com/repos/PowerShell/PowerShell/releases/latest' `
+            -Headers @{ 'User-Agent' = 'WindowsOptimizerCleanup' }
+        $tag = $release.tag_name.TrimStart('v')
+        $asset = $release.assets | Where-Object { $_.name -like '*win-x64.msi' } | Select-Object -First 1
+        if (-not $asset) { return $null }
+        return [pscustomobject]@{ Version = [version]$tag; DownloadUrl = $asset.browser_download_url; FileName = $asset.name }
+    } catch {
+        return $null
+    }
+}
+
+function Update-PowerShell7 {
+    <#  Garante que o PowerShell 7 mais recente esteja instalado. E' um
+        produto separado, instalado lado a lado com o Windows PowerShell
+        5.1 - nao substitui nem reinicia o motor deste script, que continua
+        rodando no PowerShell que ja estava em uso (ver CONTRIBUTING.md).
+        So baixa/instala quando ausente ou desatualizado (instalacao MSI
+        silenciosa via msiexec /quiet - metodo que a Microsoft recomenda
+        para servidores; winget nao esta disponivel por padrao no Windows
+        Server 2022 ou anterior).
+        Retorna $true (ja atualizado ou atualizado com sucesso), $false
+        (tentou instalar e falhou) ou $null (nao foi possivel verificar,
+        ex: sem internet). #>
+    $installed = Get-InstalledPwshVersion
+    if ($installed) { Write-Log "PowerShell 7 instalado: $installed" }
+    else { Write-Log 'PowerShell 7 nao encontrado neste servidor.' }
+
+    $latest = Get-LatestPwshRelease
+    if (-not $latest) {
+        Write-Log 'Nao foi possivel consultar a versao mais recente do PowerShell 7 (sem internet ou GitHub inacessivel).' 'WARN'
+        return $null
+    }
+    Write-Log "Versao mais recente disponivel do PowerShell 7: $($latest.Version)"
+
+    if ($installed -and $installed -ge $latest.Version) {
+        Write-Log 'PowerShell 7 ja esta na versao mais recente.'
+        return $true
+    }
+
+    Write-Log "Baixando $($latest.FileName)..."
+    $msiPath = Join-Path $env:TEMP $latest.FileName
+    try {
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 -ErrorAction Stop -Uri $latest.DownloadUrl -OutFile $msiPath
+    } catch {
+        Write-Log "Falha ao baixar o instalador do PowerShell 7: $($_.Exception.Message)" 'WARN'
+        return $null
+    }
+
+    Write-Log 'Instalando PowerShell 7 silenciosamente (msiexec /quiet)...'
+    $msiArgs = @('/package', "`"$msiPath`"", '/quiet', '/norestart', 'ADD_PATH=1', 'ENABLE_PSREMOTING=1', 'REGISTER_MANIFEST=1')
+    $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList $msiArgs -Wait -PassThru -NoNewWindow
+    Remove-Item -Path $msiPath -Force -ErrorAction SilentlyContinue
+
+    # 3010 = sucesso, reinicio necessario para concluir - nao tratamos como falha
+    if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
+        Write-Log "PowerShell 7 instalado/atualizado com sucesso (codigo de saida do msiexec: $($proc.ExitCode))."
+        return $true
+    } else {
+        Write-Log "msiexec retornou codigo de saida $($proc.ExitCode) ao instalar o PowerShell 7." 'WARN'
+        return $false
+    }
+}
+
 # --- Cache de navegadores (por perfil de usuario) ----------------------------
 
 $BrowserCachePatterns = @(
@@ -269,7 +364,28 @@ $SfcRepairResult = $null
 Show-StepMenu -CurrentStep '0'
 
 # -----------------------------------------------------------------------------
-# PASSO 1 - LIMPEZA DE ARQUIVOS TEMPORARIOS
+# PASSO 1 - VERIFICAR/ATUALIZAR POWERSHELL 7
+# Descricao: Garante que o PowerShell 7 (pwsh) mais recente esteja instalado
+# no servidor, via MSI oficial em modo silencioso (msiexec /quiet) - o
+# metodo que a propria Microsoft recomenda para servidores (o winget nao
+# esta disponivel por padrao no Windows Server 2022 ou anterior).
+#
+# Decisoes de projeto (analista de TI ja ciente, roda sem confirmacao -
+# ver CONTRIBUTING.md):
+# - Nao bloqueia nem interrompe a limpeza: sem internet ou falha na
+#   instalacao viram ALERTA no resumo (ver log para detalhes), mas os
+#   passos seguintes rodam normalmente.
+# - O PowerShell 7 e' instalado lado a lado com o Windows PowerShell 5.1 -
+#   o restante deste script continua rodando no mesmo motor que ja estava
+#   em uso (nao ha relancamento sob pwsh.exe).
+# -----------------------------------------------------------------------------
+Invoke-Step -StepKey '1' -Action {
+    $result = Update-PowerShell7
+    if ($result -ne $true) { $StepStatus['1'] = 'ALERTA' }
+}
+
+# -----------------------------------------------------------------------------
+# PASSO 2 - LIMPEZA DE ARQUIVOS TEMPORARIOS
 # Descricao: Remove os arquivos temporarios do usuario atual (%TEMP%),
 # de todos os perfis de usuario e do sistema operacional (C:\Windows\Temp).
 # Equivalente a: del /q /f /s %TEMP%\*  e  del /q /f /s C:\Windows\Temp\*
@@ -288,7 +404,7 @@ Show-StepMenu -CurrentStep '0'
 #   Update, instaladores MSI) para nao remover um temporario em uso por um
 #   processo em curso.
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '1' -Action {
+Invoke-Step -StepKey '2' -Action {
     Clear-Folder -Path $env:TEMP -Description 'Temporarios do usuario atual (%TEMP%)'
     Clear-Folder -Path 'C:\Windows\Temp' -Description 'Temporarios do sistema (C:\Windows\Temp)'
     foreach ($profileFolder in (Get-UserProfileFolders)) {
@@ -300,24 +416,24 @@ Invoke-Step -StepKey '1' -Action {
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 2 - CACHE DE NAVEGADORES
+# PASSO 3 - CACHE DE NAVEGADORES
 # Descricao: Remove o cache de disco dos navegadores mais comuns (Internet
 # Explorer, Google Chrome, Mozilla Firefox, Microsoft Edge e Opera) de todos
 # os perfis de usuario em C:\Users. Favoritos, senhas e historico nao sao
 # afetados - apenas as pastas de cache/Code Cache de cada navegador.
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '2' -Action {
+Invoke-Step -StepKey '3' -Action {
     foreach ($profileFolder in (Get-UserProfileFolders)) {
         Clear-BrowserCaches -ProfilePath $profileFolder.FullName -UserName $profileFolder.Name
     }
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 3 - ESVAZIAR A LIXEIRA DE TODOS OS USUARIOS
+# PASSO 4 - ESVAZIAR A LIXEIRA DE TODOS OS USUARIOS
 # Descricao: Remove o conteudo de C:\$Recycle.Bin (Lixeira) de todas as
 # unidades. Equivalente a: rd /s /q C:\$Recycle.bin
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '3' -Action {
+Invoke-Step -StepKey '4' -Action {
     try {
         Clear-RecycleBin -Force -ErrorAction Stop
         Write-Log 'Lixeira esvaziada com sucesso.'
@@ -328,12 +444,12 @@ Invoke-Step -StepKey '3' -Action {
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 4 - LIMPEZA DO CACHE DO WINDOWS UPDATE
+# PASSO 5 - LIMPEZA DO CACHE DO WINDOWS UPDATE
 # Descricao: Para os servicos de update, limpa C:\Windows\SoftwareDistribution
 # \Download (pacotes de update ja instalados/baixados) e reinicia os servicos.
 # Boa pratica Microsoft para recuperar espaco e corrigir updates corrompidos.
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '4' -Action {
+Invoke-Step -StepKey '5' -Action {
     $updateServices = 'wuauserv', 'bits'
     foreach ($svc in $updateServices) { Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue; Write-Log "Servico parado: $svc" }
     Clear-Folder -Path 'C:\Windows\SoftwareDistribution\Download' -Description 'Cache de download do Windows Update'
@@ -341,11 +457,11 @@ Invoke-Step -StepKey '4' -Action {
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 5 - LIMPEZA DE LOGS E CACHES SECUNDARIOS
+# PASSO 6 - LIMPEZA DE LOGS E CACHES SECUNDARIOS
 # Descricao: Remove relatorios de erro do Windows (WER), arquivos Prefetch
 # e logs CBS antigos (>30 dias), que podem crescer muito em servidores.
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '5' -Action {
+Invoke-Step -StepKey '6' -Action {
     Clear-Folder -Path 'C:\ProgramData\Microsoft\Windows\WER\ReportQueue'   -Description 'Relatorios de erro (WER - fila)'
     Clear-Folder -Path 'C:\ProgramData\Microsoft\Windows\WER\ReportArchive' -Description 'Relatorios de erro (WER - arquivo)'
     Clear-Folder -Path 'C:\Windows\Prefetch' -Description 'Arquivos Prefetch'
@@ -357,19 +473,19 @@ Invoke-Step -StepKey '5' -Action {
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 6 - SFC /SCANNOW
+# PASSO 7 - SFC /SCANNOW
 # Descricao: O System File Checker verifica a integridade de todos os
 # arquivos protegidos do sistema e repara automaticamente os corrompidos
 # usando o repositorio local (WinSxS). Ao final, $SfcRepairResult guarda se
 # houve reparo de fato (ver Test-SfcMadeRepairs), usado no relatorio final
 # para so recomendar reinicializacao quando fizer sentido.
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '6' -Action {
+Invoke-Step -StepKey '7' -Action {
     Write-Log 'Executando SFC /scannow...'
     $sfcStart = Get-Date
     $sfc = Start-Process -FilePath 'sfc.exe' -ArgumentList '/scannow' -Wait -PassThru -NoNewWindow
     Write-Log "SFC finalizado. Codigo de saida: $($sfc.ExitCode)"
-    if ($sfc.ExitCode -ne 0) { $StepStatus['6'] = 'ALERTA' }
+    if ($sfc.ExitCode -ne 0) { $StepStatus['7'] = 'ALERTA' }
 
     $script:SfcRepairResult = Test-SfcMadeRepairs -Since $sfcStart
     switch ($script:SfcRepairResult) {
@@ -380,40 +496,40 @@ Invoke-Step -StepKey '6' -Action {
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 7 - DISM /AnalyzeComponentStore
+# PASSO 8 - DISM /AnalyzeComponentStore
 # Descricao: Analisa o repositorio de componentes (WinSxS) e informa se a
 # limpeza e recomendada e quanto espaco pode ser recuperado.
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '7' -Action {
-    $exit = Invoke-DismStep -StepKey '7' -ArgumentList '/Online', '/Cleanup-Image', '/AnalyzeComponentStore'
+Invoke-Step -StepKey '8' -Action {
+    $exit = Invoke-DismStep -StepKey '8' -ArgumentList '/Online', '/Cleanup-Image', '/AnalyzeComponentStore'
     Write-Log "DISM AnalyzeComponentStore finalizado. Codigo de saida: $exit"
-    if ($exit -ne 0) { $StepStatus['7'] = 'ALERTA' }
+    if ($exit -ne 0) { $StepStatus['8'] = 'ALERTA' }
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 8 - DISM /StartComponentCleanup
+# PASSO 9 - DISM /StartComponentCleanup
 # Descricao: Remove versoes antigas e substituidas de componentes do WinSxS,
 # reduzindo o tamanho da pasta. Boa pratica Microsoft de manutencao.
 # Obs: NAO usamos /ResetBase por padrao, pois ele impede a desinstalacao
 # de updates ja instalados (descomente abaixo se desejar ganho maximo).
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '8' -Action {
-    $exit = Invoke-DismStep -StepKey '8' -ArgumentList '/Online', '/Cleanup-Image', '/StartComponentCleanup'
-    # $exit = Invoke-DismStep -StepKey '8' -ArgumentList '/Online','/Cleanup-Image','/StartComponentCleanup','/ResetBase'  # <- opcional, ganho maximo, irreversivel
+Invoke-Step -StepKey '9' -Action {
+    $exit = Invoke-DismStep -StepKey '9' -ArgumentList '/Online', '/Cleanup-Image', '/StartComponentCleanup'
+    # $exit = Invoke-DismStep -StepKey '9' -ArgumentList '/Online','/Cleanup-Image','/StartComponentCleanup','/ResetBase'  # <- opcional, ganho maximo, irreversivel
     Write-Log "DISM StartComponentCleanup finalizado. Codigo de saida: $exit"
-    if ($exit -ne 0) { $StepStatus['8'] = 'ALERTA' }
+    if ($exit -ne 0) { $StepStatus['9'] = 'ALERTA' }
 }
 
 # -----------------------------------------------------------------------------
-# PASSO 9 - DISM /RestoreHealth
+# PASSO 10 - DISM /RestoreHealth
 # Descricao: Verifica e repara corrupcoes na imagem do Windows usando o
 # Windows Update como fonte. Complementa o SFC (repara o proprio repositorio
 # que o SFC usa). Requer acesso ao Windows Update ou fonte WSUS/ISO.
 # -----------------------------------------------------------------------------
-Invoke-Step -StepKey '9' -Action {
-    $exit = Invoke-DismStep -StepKey '9' -ArgumentList '/Online', '/Cleanup-Image', '/RestoreHealth'
+Invoke-Step -StepKey '10' -Action {
+    $exit = Invoke-DismStep -StepKey '10' -ArgumentList '/Online', '/Cleanup-Image', '/RestoreHealth'
     Write-Log "DISM RestoreHealth finalizado. Codigo de saida: $exit"
-    if ($exit -ne 0) { $StepStatus['9'] = 'ALERTA' }
+    if ($exit -ne 0) { $StepStatus['10'] = 'ALERTA' }
 }
 
 # -----------------------------------------------------------------------------

@@ -6,6 +6,29 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/)
 (ver regras em [CONTRIBUTING.md](CONTRIBUTING.md#versionamento-semver)).
 
+## [1.3.0] - 2026-07-17
+
+### Adicionado
+
+- Novo Passo 1: **Verificar/atualizar PowerShell 7**. Consulta a API do
+  GitHub pela versão estável mais recente, compara com a versão instalada
+  (`pwsh.exe`) e, se ausente ou desatualizada, baixa o MSI oficial e
+  instala silenciosamente (`msiexec /quiet`) — o método que a própria
+  Microsoft recomenda para servidores (`winget` não está disponível por
+  padrão no Windows Server 2022 ou anterior).
+- Os passos antigos 1–9 foram renumerados para 2–10 para abrir espaço
+  para o novo Passo 1.
+
+### Alterado
+
+- Este passo roda sem confirmação do operador (uso consciente por
+  analistas de TI) e **nunca bloqueia a limpeza**: falha de rede, GitHub
+  inacessível ou erro na instalação viram `ALERTA` no resumo (detalhes no
+  log), mas os passos seguintes rodam normalmente.
+- O PowerShell 7 é instalado lado a lado com o Windows PowerShell 5.1 —
+  o restante do script continua rodando no mesmo motor que já estava em
+  uso (sem relançamento sob `pwsh.exe`).
+
 ## [1.2.0] - 2026-07-17
 
 ### Adicionado

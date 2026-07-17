@@ -6,7 +6,7 @@
 
 Script de limpeza e otimização de Windows (Server e Desktop) com boas práticas Microsoft.
 
-[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.2.0-blue)](./CHANGELOG.md)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.3.0-blue)](./CHANGELOG.md)
 [![Licença](https://img.shields.io/badge/licen%C3%A7a-Expertise4All-brightgreen)](./LICENSE)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](#requisitos)
 
@@ -21,22 +21,23 @@ Script de limpeza e otimização de Windows (Server e Desktop) com boas prática
 | **Autor**   | Pablo Fernando Schütz |
 | **Empresa** | Expertise Tecnologia |
 | **Setor**   | TI / NOC |
-| **Versão**  | 1.2.0 |
+| **Versão**  | 1.3.0 |
 | **Licença** | [Expertise4All](./LICENSE) — uso público e liberado |
 
 ---
 
 ## O que o script faz (em ordem)
 
-1. **Temporários** — limpa `%TEMP%`, `C:\Windows\Temp` e a pasta Temp de todos os perfis de usuário (útil em RDS).
-2. **Cache de navegadores** — limpa o cache dos navegadores mais comuns (Internet Explorer, Google Chrome, Mozilla Firefox, Microsoft Edge e Opera) de todos os perfis de usuário. Favoritos, senhas e histórico não são afetados.
-3. **Lixeira** — esvazia `C:\$Recycle.Bin` de todos os usuários.
-4. **Cache do Windows Update** — para `wuauserv`/`bits`, limpa `SoftwareDistribution\Download` e reinicia os serviços.
-5. **Logs e caches secundários** — WER (relatórios de erro), Prefetch e logs CBS com mais de 30 dias.
-6. **`sfc /scannow`** — verifica e repara arquivos de sistema.
-7. **`DISM /AnalyzeComponentStore`** — analisa o WinSxS.
-8. **`DISM /StartComponentCleanup`** — remove componentes substituídos do WinSxS.
-9. **`DISM /RestoreHealth`** — repara a imagem do Windows via Windows Update.
+1. **Verificar/atualizar PowerShell 7** — consulta a versão estável mais recente no GitHub e, se ausente ou desatualizada, instala silenciosamente via MSI oficial. Roda sem confirmação (uso consciente por analistas de TI) e **nunca bloqueia a limpeza**: sem internet ou falha na instalação viram apenas um aviso no resumo.
+2. **Temporários** — limpa `%TEMP%`, `C:\Windows\Temp` e a pasta Temp de todos os perfis de usuário (útil em RDS).
+3. **Cache de navegadores** — limpa o cache dos navegadores mais comuns (Internet Explorer, Google Chrome, Mozilla Firefox, Microsoft Edge e Opera) de todos os perfis de usuário. Favoritos, senhas e histórico não são afetados.
+4. **Lixeira** — esvazia `C:\$Recycle.Bin` de todos os usuários.
+5. **Cache do Windows Update** — para `wuauserv`/`bits`, limpa `SoftwareDistribution\Download` e reinicia os serviços.
+6. **Logs e caches secundários** — WER (relatórios de erro), Prefetch e logs CBS com mais de 30 dias.
+7. **`sfc /scannow`** — verifica e repara arquivos de sistema.
+8. **`DISM /AnalyzeComponentStore`** — analisa o WinSxS.
+9. **`DISM /StartComponentCleanup`** — remove componentes substituídos do WinSxS.
+10. **`DISM /RestoreHealth`** — repara a imagem do Windows via Windows Update.
 
 Todos os passos rodam com aprovação automática (sem prompts). Durante a execução, o console mostra
 um menu fixo com o status de cada passo (e a porcentagem ao vivo nos passos de DISM) em vez de
@@ -49,6 +50,7 @@ execução (sem repetir o menu de passos) e o relatório de espaço. O log compl
 - Windows 10/11 ou Windows Server 2016 ou superior (PowerShell 5.1+)
 - Executar como **Administrador**
 - Acesso ao Windows Update (ou WSUS) para o passo `RestoreHealth`
+- Acesso à internet (`github.com`) é **opcional** — usado só no Passo 1 para verificar/instalar o PowerShell 7; sem internet, esse passo vira um aviso no resumo e o restante da limpeza roda normalmente
 
 ## Como executar
 

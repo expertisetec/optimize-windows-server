@@ -79,3 +79,28 @@ instalado). Faça commit do PNG junto com a mudança de versão.
 O GitHub **não** tem API para o campo Social Preview — mesmo com o PNG do
 repositório atualizado, o passo final continua manual: Settings → General →
 Social preview → Edit → Upload an image.
+
+## Passos que instalam/alteram software no servidor
+
+O `WindowsOptimizerCleanup.ps1` tem um passo (verificação/atualização do
+PowerShell 7) que baixa e instala software a partir da internet, sem pedir
+confirmação do operador. Isso é aceitável **apenas** porque:
+
+- O script é usado conscientemente por analistas de TI que já sabem o que
+  ele faz (não é distribuído para usuários finais sem supervisão).
+- A ação nunca bloqueia a finalidade principal do script (limpeza): falha
+  de rede/instalação vira `ALERTA` no resumo e o script segue em frente.
+- O software instalado (PowerShell 7) é lado a lado com o que já existe —
+  não substitui, não remove, não força reinicialização do próprio motor
+  do script.
+
+Se um novo script da série precisar de um passo parecido (instalar/atualizar
+algo automaticamente), siga o mesmo padrão: **nunca** deixe uma falha de
+rede ou de instalação interromper o restante do script, e documente a
+decisão aqui.
+
+Sobre `winget`: **não use** como único mecanismo de instalação nesta série.
+A documentação da Microsoft confirma que `winget` não vem por padrão no
+Windows Server 2022 ou anterior — que é justamente o público-alvo declarado
+destes scripts. Prefira MSI com instalação silenciosa (`msiexec /quiet`),
+que é o que a própria Microsoft recomenda para servidores.
