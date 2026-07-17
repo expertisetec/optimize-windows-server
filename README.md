@@ -6,7 +6,7 @@
 
 Script de limpeza e otimização de Windows (Server e Desktop) com boas práticas Microsoft.
 
-[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.1.0-blue)](./CHANGELOG.md)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.2.0-blue)](./CHANGELOG.md)
 [![Licença](https://img.shields.io/badge/licen%C3%A7a-Expertise4All-brightgreen)](./LICENSE)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](#requisitos)
 
@@ -21,7 +21,7 @@ Script de limpeza e otimização de Windows (Server e Desktop) com boas prática
 | **Autor**   | Pablo Fernando Schütz |
 | **Empresa** | Expertise Tecnologia |
 | **Setor**   | TI / NOC |
-| **Versão**  | 1.1.0 |
+| **Versão**  | 1.2.0 |
 | **Licença** | [Expertise4All](./LICENSE) — uso público e liberado |
 
 ---
@@ -40,7 +40,8 @@ Script de limpeza e otimização de Windows (Server e Desktop) com boas prática
 
 Todos os passos rodam com aprovação automática (sem prompts). Durante a execução, o console mostra
 um menu fixo com o status de cada passo (e a porcentagem ao vivo nos passos de DISM) em vez de
-despejar dezenas de linhas de progresso na tela. O log completo é sempre gravado em
+despejar dezenas de linhas de progresso na tela. Ao final, a tela é limpa e mostra só o resumo da
+execução (sem repetir o menu de passos) e o relatório de espaço. O log completo é sempre gravado em
 `C:\Expertise\Logs\` e, ao final, o script pergunta se você deseja mantê-lo ou descartá-lo.
 
 ## Requisitos
@@ -67,7 +68,7 @@ irm https://raw.githubusercontent.com/expertisetec/windows-optimizer-cleanup/mai
 ## Recomendações
 
 - Execute em **janela de manutenção**: SFC e DISM podem levar de 15 a 60+ minutos e consomem CPU/disco.
-- Reinicie o **Sistema Operacional** após a execução caso reparos tenham sido aplicados (o script roda em qualquer Windows, não apenas Server).
+- O script só recomenda reiniciar o **Sistema Operacional** quando o SFC realmente reparou algo (confirmado via `CBS.log`); quando não há reparo, informa que a reinicialização não é necessária.
 - Faça snapshot/backup antes da primeira execução em servidores críticos.
 - A opção `DISM /ResetBase` está comentada no script: libera mais espaço, porém impede desinstalar updates já aplicados.
 

@@ -6,6 +6,26 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/)
 (ver regras em [CONTRIBUTING.md](CONTRIBUTING.md#versionamento-semver)).
 
+## [1.2.0] - 2026-07-17
+
+### Adicionado
+
+- Detecção real de reparo do SFC: `Test-SfcMadeRepairs` lê o `CBS.log`
+  (tags internas `[SR]`, não localizadas — ao contrário do texto que o
+  `sfc.exe` imprime no console) para confirmar se o `/scannow` reparou
+  algum arquivo desde o início daquele passo.
+
+### Alterado
+
+- A recomendação de reinicialização no relatório final agora é
+  condicional ao resultado real do SFC: só recomenda quando houve reparo
+  confirmado; quando não há reparo, informa que não é necessário; quando
+  não é possível confirmar (`CBS.log` ausente/ilegível), erra para o
+  lado seguro e recomenda mesmo assim.
+- A tela final não reexibe mais o menu de passos numerado (que já tinha
+  sido mostrado durante a execução) — agora limpa a tela e mostra só o
+  resumo final, sem duplicidade.
+
 ## [1.1.0] - 2026-07-17
 
 ### Adicionado

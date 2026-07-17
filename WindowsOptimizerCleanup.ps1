@@ -10,7 +10,7 @@
   Setor       : Tecnologia da Informacao / NOC
   Autor       : Pablo Fernando Schutz
   Empresa     : Expertise Tecnologia
-  Versao      : 1.1.0
+  Versao      : 1.2.0
   Data        : 17/07/2026
   Licenca     : Expertise4All - uso publico e liberado (ver arquivo LICENSE)
   Requisitos  : Windows 10/11 ou Windows Server 2016 ou superior | PowerShell 5.1+
@@ -32,7 +32,7 @@
 # CONFIGURACAO INICIAL E LOG
 # -----------------------------------------------------------------------------
 $ErrorActionPreference = 'Continue'
-$ScriptVersion = '1.1.0'
+$ScriptVersion = '1.2.0'
 $LogDir  = 'C:\Expertise\Logs'
 $LogFile = Join-Path $LogDir ("WindowsOptimizerCleanup_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
 
@@ -223,6 +223,35 @@ function Clear-BrowserCaches {
     }
 }
 
+function Test-SfcMadeRepairs {
+    <#  Verifica no CBS.log se o SFC reparou algum arquivo desde $Since.
+        Usa as tags internas "[SR]" do CBS.log (fixas em ingles, nao
+        localizadas) em vez do texto que o sfc.exe imprime no console
+        (esse sim varia conforme o idioma do Windows). Retorna $true
+        (reparou), $false (nao reparou) ou $null (nao foi possivel
+        confirmar - CBS.log ausente/ilegivel ou fora da janela lida). #>
+    param([datetime]$Since)
+    $cbsLog = 'C:\Windows\Logs\CBS\CBS.log'
+    if (-not (Test-Path $cbsLog)) { return $null }
+    try {
+        $lines = Get-Content -Path $cbsLog -Tail 50000 -ErrorAction Stop | Where-Object { $_ -match '\[SR\]' }
+    } catch {
+        return $null
+    }
+    $found = $false
+    foreach ($line in $lines) {
+        if ($line.Length -lt 19) { continue }
+        $ts = [datetime]::MinValue
+        $parsed = [datetime]::TryParseExact(
+            $line.Substring(0, 19), 'yyyy-MM-dd HH:mm:ss', $null,
+            [System.Globalization.DateTimeStyles]::None, [ref]$ts)
+        if ($parsed -and $ts -ge $Since -and ($line -match 'Repairing corrupted file' -or $line -match 'Cannot repair member file')) {
+            $found = $true
+        }
+    }
+    return $found
+}
+
 # -----------------------------------------------------------------------------
 # INICIO DA EXECUCAO
 # -----------------------------------------------------------------------------
@@ -235,6 +264,7 @@ Write-Log "Log salvo em: $LogFile"
 
 $FreeBefore = Get-FreeSpaceGB
 Write-Log "Espaco livre em C: ANTES da limpeza: $FreeBefore GB"
+$SfcRepairResult = $null
 
 Show-StepMenu -CurrentStep '0'
 
@@ -330,13 +360,23 @@ Invoke-Step -StepKey '5' -Action {
 # PASSO 6 - SFC /SCANNOW
 # Descricao: O System File Checker verifica a integridade de todos os
 # arquivos protegidos do sistema e repara automaticamente os corrompidos
-# usando o repositorio local (WinSxS).
+# usando o repositorio local (WinSxS). Ao final, $SfcRepairResult guarda se
+# houve reparo de fato (ver Test-SfcMadeRepairs), usado no relatorio final
+# para so recomendar reinicializacao quando fizer sentido.
 # -----------------------------------------------------------------------------
 Invoke-Step -StepKey '6' -Action {
     Write-Log 'Executando SFC /scannow...'
+    $sfcStart = Get-Date
     $sfc = Start-Process -FilePath 'sfc.exe' -ArgumentList '/scannow' -Wait -PassThru -NoNewWindow
     Write-Log "SFC finalizado. Codigo de saida: $($sfc.ExitCode)"
     if ($sfc.ExitCode -ne 0) { $StepStatus['6'] = 'ALERTA' }
+
+    $script:SfcRepairResult = Test-SfcMadeRepairs -Since $sfcStart
+    switch ($script:SfcRepairResult) {
+        $true   { Write-Log 'SFC reparou arquivos (detectado via CBS.log).' }
+        $false  { Write-Log 'SFC nao encontrou/reparou arquivos (confirmado via CBS.log).' }
+        default { Write-Log 'Nao foi possivel confirmar reparo do SFC via CBS.log.' 'WARN' }
+    }
 }
 
 # -----------------------------------------------------------------------------
@@ -390,7 +430,14 @@ Write-Log "  Espaco recuperado  : $Recovered GB"
 Write-Log "  Log completo       : $LogFile"
 Write-Log '==============================================================='
 
-Show-StepMenu -CurrentStep '0'
+# Tela final: limpa o console e mostra SO o resumo (nao reexibe o menu de
+# passos com numeracao/caixa - isso duplicaria a mesma informacao).
+Clear-Host
+Write-Host '===============================================================' -ForegroundColor Cyan
+Write-Host ' EXPERTISE TECNOLOGIA - WindowsOptimizerCleanup' -ForegroundColor Cyan
+Write-Host " Versao: $ScriptVersion | Computador: $env:COMPUTERNAME" -ForegroundColor Cyan
+Write-Host '===============================================================' -ForegroundColor Cyan
+Write-Host ''
 
 Write-Host 'Resumo da execucao:' -ForegroundColor Cyan
 foreach ($key in $Steps.Keys) {
@@ -410,8 +457,23 @@ Write-Host ("  Espaco livre ANTES  : {0} GB" -f $FreeBefore)
 Write-Host ("  Espaco livre DEPOIS : {0} GB" -f $FreeAfter)
 Write-Host ("  Espaco recuperado   : {0} GB" -f $Recovered)
 Write-Host ''
-Write-Host 'Concluido. Recomenda-se reiniciar o Sistema Operacional em janela de' -ForegroundColor Cyan
-Write-Host 'manutencao caso o SFC/DISM tenha reparado arquivos.' -ForegroundColor Cyan
+
+# Reinicializacao: so recomendamos de fato quando o SFC comprovadamente
+# reparou algo. Quando nao da' para confirmar (CBS.log ausente/ilegivel),
+# erramos para o lado seguro e recomendamos mesmo assim.
+if ($SfcRepairResult -eq $false) {
+    Write-Host 'SFC nao encontrou nem reparou arquivos de sistema - reinicializacao' -ForegroundColor Green
+    Write-Host 'nao e necessaria por causa do SFC.' -ForegroundColor Green
+} elseif ($SfcRepairResult -eq $true) {
+    Write-Host 'SFC reparou arquivos de sistema - recomenda-se reiniciar o Sistema' -ForegroundColor Yellow
+    Write-Host 'Operacional em janela de manutencao.' -ForegroundColor Yellow
+} else {
+    Write-Host 'Nao foi possivel confirmar pelo CBS.log se o SFC reparou arquivos -' -ForegroundColor Yellow
+    Write-Host 'por seguranca, recomenda-se reiniciar o Sistema Operacional em' -ForegroundColor Yellow
+    Write-Host 'janela de manutencao e revisar o log.' -ForegroundColor Yellow
+}
+Write-Host ''
+Write-Host 'Concluido.' -ForegroundColor Cyan
 Write-Host ''
 
 # -----------------------------------------------------------------------------
